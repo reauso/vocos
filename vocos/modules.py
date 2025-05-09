@@ -43,19 +43,10 @@ class ConvNeXtBlock(nn.Module):
     def forward(self, x: torch.Tensor, cond_embedding_id: Optional[torch.Tensor] = None) -> torch.Tensor:
         residual = x
         x = self.dwconv(x)
-        x = x.transpose(1, 2)  # (B, C, T) -> (B, T, C)
-        if self.adanorm:
-            assert cond_embedding_id is not None
-            x = self.norm(x, cond_embedding_id)
-        else:
-            x = self.norm(x)
-        x = self.pwconv1(x)
+        x = self.norm.weight.data * x / torch.norm(x, p=2, dim=1, keepdim=True) + self.norm.bias.data
+        x = torch.matmul(self.pwconv1.weight.data, x) + self.pwconv1.bias.data
         x = self.act(x)
-        x = self.pwconv2(x)
-        if self.gamma is not None:
-            x = self.gamma * x
-        x = x.transpose(1, 2)  # (B, T, C) -> (B, C, T)
-
+        x = torch.matmul(self.pwconv2.weight.data, x) + self.pwconv2.bias.data
         x = residual + x
         return x
 

@@ -74,19 +74,13 @@ class VocosBackbone(Backbone):
             nn.init.trunc_normal_(m.weight, std=0.02)
             nn.init.constant_(m.bias, 0)
 
+
     def forward(self, x: torch.Tensor, **kwargs) -> torch.Tensor:
-        bandwidth_id = kwargs.get('bandwidth_id', None)
         x = self.embed(x)
-        if self.adanorm:
-            assert bandwidth_id is not None
-            x = self.norm(x.transpose(1, 2), cond_embedding_id=bandwidth_id)
-        else:
-            x = self.norm(x.transpose(1, 2))
-        x = x.transpose(1, 2)
+        x = self.norm.weight.data * x / torch.norm(x, p=2, dim=1, keepdim=True) + self.norm.bias.data
         for conv_block in self.convnext:
-            x = conv_block(x, cond_embedding_id=bandwidth_id)
-        x = self.final_layer_norm(x.transpose(1, 2))
-        return x
+            x = conv_block(x, cond_embedding_id=None)
+        return self.final_layer_norm.weight.data * x / torch.norm(x, p=2, dim=1, keepdim=True) + self.final_layer_norm.bias.data
 
 
 class VocosResNetBackbone(Backbone):
